@@ -98,9 +98,10 @@ function setupSetupScreen() {
     for (let i = 0; i < n; i++) {
       const input = document.createElement("input");
       input.type = "text";
-      input.placeholder = `Player ${i + 1} name`;
+      input.placeholder = `Player ${i + 1} name (max 30 chars)`;
       input.value = `Player ${i + 1}`;
       input.dataset.index = i.toString();
+      input.maxLength = 30;                 // <-- UI hard cap
       nameWrap.appendChild(input);
     }
   }
@@ -143,7 +144,11 @@ function setupSetupScreen() {
       const startingScore = getSelectedStartingScore();
       const startPlayer   = getSelectedStartPlayerIndex();
       const nameInputs    = [...nameWrap.querySelectorAll("input")];
-      const players       = nameInputs.map((inp, idx) => inp.value?.trim() || `Player ${idx + 1}`);
+      const players       = nameInputs.map((inp, idx) => {
+        const raw = (inp.value ?? "").trim();
+        const capped = raw.slice(0, 30);   // <-- defensive cap on submit
+        return capped || `Player ${idx + 1}`;
+      });
 
       try {
         Match?.initNewMatch?.({
@@ -285,7 +290,7 @@ function submitMatchScore() {
 }
 
 // =====================================================
-// SUMMARY / AVERAGES — dynamic cards (2–6 players)
+// SUMMARY / AVERAGES — dynamic cards (2–6 players) + names in Leg History
 // =====================================================
 function pct(n)         { return isFinite(n) ? `${(Math.round(n * 10) / 10).toFixed(1)}%` : "0.0%"; }
 function toFixed(n,d=1) { return (typeof n === "number" && isFinite(n)) ? n.toFixed(d) : "0.0"; }
@@ -343,9 +348,10 @@ function renderSummaryScreen() {
 
   avgs.innerHTML = `<section class="averages-grid">${cardsHTML}</section>`;
 
-  // Optional: leg history (if provided by engine)
+  // Leg history using player names
   if (setsLegs) {
     const hist = (Match && typeof Match.getLegHistory === "function") ? Match.getLegHistory() : [];
+    const playersArr = (Match && typeof Match.getPlayers === "function") ? Match.getPlayers() : [];
     setsLegs.innerHTML = "";
     if (hist && hist.length) {
       const wrap = document.createElement("div");
@@ -354,8 +360,10 @@ function renderSummaryScreen() {
       h.textContent = "Leg History";
       wrap.appendChild(h);
       hist.forEach((leg, idx) => {
+        const winnerIdx = leg.winnerIndex ?? 0;
+        const winnerName = playersArr[winnerIdx]?.name ?? `Player ${winnerIdx + 1}`;
         const p = document.createElement("p");
-        p.textContent = `Leg ${idx + 1}: Winner P${(leg.winnerIndex ?? 0) + 1}, Darts ${leg.dartsThrown}`;
+        p.textContent = `Leg ${idx + 1}: ${winnerName} — Darts ${leg.dartsThrown}`;
         wrap.appendChild(p);
       });
       setsLegs.appendChild(wrap);
