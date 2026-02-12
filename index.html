@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dart Scorer</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- (Optional) PWA bits—keep if you already use them -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+  <link rel="shortcut icon" href="favicon.ico" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+</head>
+<body>
+  <!-- Top Navigation -->
+  <nav class="top-nav">
+    <button data-screen="setup" class="active">Setup</button>
+    <button data-screen="match">Match</button>
+    <button data-screen="summary">Summary</button>
+    <button data-screen="doubles">Doubles</button>
+    <button data-screen="settings">Settings</button>
+  </nav>
+
+  <main>
+    <!-- =============== SETUP SCREEN =============== -->
+    <section id="screen-setup" class="screen active">
+      <h2>Match Setup</h2>
+
+      <div class="setup-block">
+        <h3>Game Mode</h3>
+        <div id="game-mode-select" class="button-row">
+          <button class="select-btn active" data-mode="x01">X01 Match</button>
+        </div>
+      </div>
+
+      <div id="x01-setup-area">
+        <div class="setup-block">
+          <h3>Number of Players</h3>
+          <div id="player-count-select" class="button-row">
+            <button class="select-btn active" data-count="2">2</button>
+            <button class="select-btn" data-count="3">3</button>
+            <button class="select-btn" data-count="4">4</button>
+            <button class="select-btn" data-count="5">5</button>
+            <button class="select-btn" data-count="6">6</button>
+          </div>
+        </div>
+
+        <div class="setup-block">
+          <h3>Starting Score</h3>
+          <div id="starting-score-select" class="button-row">
+            <button class="select-btn active" data-score="501">501</button>
+            <button class="select-btn" data-score="301">301</button>
+            <button class="select-btn" data-score="101">101</button>
+          </div>
+        </div>
+
+        <div class="setup-block">
+          <h3>Player Names</h3>
+          <div id="player-name-inputs"></div>
+        </div>
+
+        <div class="setup-block">
+          <h3>Starting Thrower</h3>
+          <div id="starting-thrower-select"></div>
+        </div>
+      </div>
+
+      <button id="start-match-btn" class="primary-btn">Start</button>
+    </section>
+
+    <!-- =============== MATCH SCREEN =============== -->
+    <section id="screen-match" class="screen">
+      <div id="scoreboard" class="scoreboard"></div>
+      <div class="checkout" id="checkout-display">Checkout: —</div>
+
+      <!-- Keypad -->
+      <div class="keypad">
+        <button class="key">1</button>
+        <button class="key">2</button>
+        <button class="key">3</button>
+        <button class="key">4</button>
+        <button class="key">5</button>
+        <button class="key">6</button>
+        <button class="key">7</button>
+        <button class="key">8</button>
+        <button class="key">9</button>
+        <button class="key key-zero">0</button>
+        <button class="key key-undo">Undo</button>
+        <button class="key key-enter">Enter</button>
+      </div>
+      <div class="entry-display" id="entry-display">Score: —</div>
+    </section>
+
+    <!-- =============== SUMMARY SCREEN =============== -->
+    <section id="screen-summary" class="screen">
+      <h2>Match Summary</h2>
+      <div id="summary-averages"></div>
+      <div id="summary-sets-legs"></div>
+    </section>
+
+    <!-- =============== DOUBLES PRACTICE (v1.0 UI) =============== -->
+    <section id="screen-doubles" class="screen">
+      <h2>Doubles Practice</h2>
+
+      <!-- Current target and suggestion -->
+      <div id="doubles-target" class="big-target">—</div>
+      <div id="doubles-suggestion" class="suggestion">—</div>
+
+      <!-- Big Hit / Miss buttons -->
+      <div id="doubles-actions" role="group" aria-label="Doubles actions">
+        <button id="doubles-hit-btn" class="btn-big btn-hit" aria-label="Hit it">Hit it!</button>
+        <button id="doubles-miss-btn" class="btn-big btn-miss" aria-label="Missed it">Missed it!</button>
+      </div>
+
+      <!-- Finish % card -->
+      <div id="doubles-stats" aria-live="polite">
+        <h3>Finish %</h3>
+        <div class="stat-line">
+          <span class="stat-label">1 Dart</span>
+          <span id="doubles-pct-1d" class="stat-value">0.0%</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">2 Dart</span>
+          <span id="doubles-pct-2d" class="stat-value">0.0%</span>
+        </div>
+        <div class="stat-line">
+          <span class="stat-label">3 Dart</span>
+          <span id="doubles-pct-3d" class="stat-value">0.0%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- =============== SETTINGS =============== -->
+    <section id="screen-settings" class="screen">
+      <h2>Settings</h2>
+      <button id="reset-data-btn" class="danger-btn">Reset All Data</button>
+    </section>
+  </main>
+
+  <!-- ENGINE SCRIPTS (order matters) -->
+  <script src="engine/state.js"></script>
+  <script src="engine/match.js"></script>
+  <script src="engine/undo.js"></script> <!-- load AFTER match.js to fix earlier Undefined issue -->
+  <script src="engine/doubles.js"></script>
+  <!-- Load checkout table BEFORE checkout engine -->
+  <script src="data/checkout_table.js"></script>
+  <script src="engine/checkout.js"></script>
+  <!-- APP -->
+  <script src="app.js"></script>
+
+  <!-- Service worker (optional) -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js");
+    }
+  </script>
+</body>
+</html>
