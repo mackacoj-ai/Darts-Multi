@@ -7,9 +7,7 @@
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
 }
-html, body {
-  height: 100%;
-}
+html, body { height: 100%; }
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, Helvetica, Arial, sans-serif;
@@ -67,7 +65,7 @@ body {
     --p4: #c0aaff;
     --p5: #ffc078;
 
-    /* Dartboard palette (unchanged; stays flat) */
+    /* Dartboard palette (flat) */
     --dart-red:   #C21E1E;
     --dart-black: #0c0c0c;
     --dart-green: #2E7D32;
@@ -112,7 +110,6 @@ main { flex: 1; overflow-y: auto; padding: 1rem; }
 /* ===========================
    SETUP SCREEN — Classic, block colours
    =========================== */
-/* Board-like split background (flat colours) */
 #screen-setup {
   background:
     linear-gradient(
@@ -256,31 +253,40 @@ main { flex: 1; overflow-y: auto; padding: 1rem; }
   font-weight: 800;
 }
 
-/* Score + micro labels wrapper (L:x left, S:x right) */
+/* Score row + labels: single tint, inherited by children */
 .player-score-wrap {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: .5rem;
+
+  /* ensures L:, main SCORE, and S: share the same colour */
+  color: var(--tone, var(--accent));
 }
+
+/* main score inherits the row's tint */
 .player-score {
   font-size: 2.6rem;
   font-weight: 800;
+  color: inherit;
 }
 
-/* Micro tags for Legs/Sets */
+/* L: and S: — text‑only, no box, same colour as score */
 .micro-tag {
   font-weight: 800;
   font-size: .95rem;
   line-height: 1;
-  padding: .2rem .4rem;
-  border-radius: 6px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  opacity: .9;
+  padding: 0;                 /* no box padding */
+  background: transparent;    /* blend with score area */
+  border: none;               /* remove box outline */
+  color: inherit;             /* EXACT same colour as main score */
+  white-space: nowrap;
 }
 .micro-left  { justify-self: start; }
-.micro-right { justify-self: end; }
+.micro-right {
+  justify-self: end;
+  transform: translateX(-4px); /* move S: a bit closer to the big number to avoid active ring overlap */
+}
 
 /* Tinted overlay and active ring by player index */
 .player-card::before {
@@ -290,7 +296,8 @@ main { flex: 1; overflow-y: auto; padding: 1rem; }
   opacity: 0.22; pointer-events: none;
 }
 .player-card.active { box-shadow: 0 0 0 3px var(--tone, var(--accent)) inset; }
-.player-card .player-score { color: var(--tone, var(--accent)); }
+/* the score itself picks up the tint from .player-score-wrap */
+.player-card .player-score { color: inherit; }
 
 /* Colour tokens per seat */
 .player-color-0 { --tone: var(--p0); }
@@ -325,10 +332,8 @@ main { flex: 1; overflow-y: auto; padding: 1rem; }
   color: var(--button-text);
   font-weight: 600;
 }
-/* Prevent double‑tap zoom on mobile */
-.key, .select-btn, .btn-big, button {
-  touch-action: manipulation;
-}
+/* Prevent double‑tap zoom on mobile for interactive controls */
+.key, .select-btn, .btn-big, button { touch-action: manipulation; }
 
 .key-zero { grid-column: span 2; }
 .key-undo { background: #ff9f0a; color: #fff; }  /* orange for Undo */
