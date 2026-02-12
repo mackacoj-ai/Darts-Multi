@@ -1,5 +1,5 @@
 // =============================================
-// APP CONTROLLER (v2.0 core + v1.0 Doubles UI + dynamic Summary)
+// APP CONTROLLER (v2.0 core + Doubles UI + dynamic Summary)
 // =============================================
 let scoreBuffer = "";                 // for match keypad
 let matchKeyListenerBound = false;    // guard multiple keydown handlers
@@ -27,8 +27,29 @@ document.addEventListener("DOMContentLoaded", () => {
     try { Doubles.init(); } catch (e) { console.error("[Doubles.init] failed:", e); }
   }
 
+  // Mobile UX: prevent double-tap zoom on interactive buttons
+  enableNoDoubleTapZoom();
+
   switchScreen("setup");
 });
+
+// =============================================
+// MOBILE: Prevent double-tap zoom on buttons/keys
+// =============================================
+function enableNoDoubleTapZoom() {
+  // CSS (touch-action) is in style.css; here we also block rapid double "touchend" default
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    // Only for interactive elements
+    const el = e.target.closest('.key, .select-btn, .btn-big, button');
+    if (!el) return;
+    if (now - lastTouchEnd <= 300) {
+      e.preventDefault(); // prevent double-tap zoom
+    }
+    lastTouchEnd = now;
+  }, { passive: false });
+}
 
 // =====================================================
 // NAVIGATION
@@ -65,15 +86,16 @@ function safeRender(fn) {
 }
 
 // =====================================================
-// SETUP SCREEN (modes, players, starting score/thrower)
+// SETUP SCREEN (players, starting score, starting thrower)
+// Always starts X01 from here (Doubles via nav tab only)
 // =====================================================
 function setupSetupScreen() {
-  const modeRow    = document.getElementById("game-mode-select");
-  const countRow   = document.getElementById("player-count-select");
-  const scoreRow   = document.getElementById("starting-score-select");
-  const nameWrap   = document.getElementById("player-name-inputs");
-  const throwerWrap= document.getElementById("starting-thrower-select");
-  const startBtn   = document.getElementById("start-match-btn");
+  const modeRow     = document.getElementById("game-mode-select");
+  const countRow    = document.getElementById("player-count-select");
+  const scoreRow    = document.getElementById("starting-score-select");
+  const nameWrap    = document.getElementById("player-name-inputs");
+  const throwerWrap = document.getElementById("starting-thrower-select");
+  const startBtn    = document.getElementById("start-match-btn");
 
   function wireSelectRow(rowEl, onChange) {
     if (!rowEl) return;
@@ -130,13 +152,13 @@ function setupSetupScreen() {
   }
 
   // Wire selectors + initial render
-  wireSelectRow(modeRow,  () => {}); // mode exists visually but we always start X01 from Setup
+  wireSelectRow(modeRow,  () => {}); // Mode visible but not branching
   wireSelectRow(countRow, () => { renderNameInputs(); renderStartingThrower(); });
   wireSelectRow(scoreRow, () => {});
   renderNameInputs();
   renderStartingThrower();
 
-  // Always start an X01 match from Setup (no Doubles here)
+  // Always start an X01 match from Setup
   if (startBtn) {
     startBtn.addEventListener("click", () => {
       const startingScore = getSelectedStartingScore();
@@ -161,7 +183,7 @@ function setupSetupScreen() {
 }
 
 // =====================================================
-// MATCH RENDERING + KEYPAD (X01)
+// MATCH RENDERING + KEYPAD (X01) + Legs/Sets micro‑labels
 // =====================================================
 function renderMatchScreen() {
   const board      = document.getElementById("scoreboard");
@@ -172,22 +194,34 @@ function renderMatchScreen() {
   const players = (Match && typeof Match.getPlayers === "function") ? Match.getPlayers() : [];
   const current = (Match && typeof Match.getCurrentPlayer === "function") ? Match.getCurrentPlayer() : 0;
 
-  // Render scoreboard (colour‑tinted cards)
+  // Render scoreboard
   board.innerHTML = "";
   players.forEach((p, idx) => {
     const card  = document.createElement("div");
     const tint  = ` player-color-${idx % 6}`;
     card.className = "player-card" + tint + (idx === current ? " active" : "");
 
-    const name  = document.createElement("h2");
+    const name = document.createElement("h2");
     name.textContent = p.name ?? `Player ${idx + 1}`;
+
+    // Score + micro bar: L:x on left, S:x on right
+    const scoreWrap = document.createElement("div");
+    scoreWrap.className = "player-score-wrap";
+
+    const legsEl = document.createElement("span");
+    legsEl.className = "micro-tag micro-left";
+    legsEl.textContent = `L:${p.legsWon ?? 0}`;
 
     const score = document.createElement("div");
     score.className = "player-score";
     score.textContent = p.score ?? 0;
 
-    card.appendChild(name);
-    card.appendChild(score);
+    const setsEl = document.createElement("span");
+    setsEl.className = "micro-tag micro-right";
+    setsEl.textContent = `S:${p.setsWon ?? 0}`;
+
+    scoreWrap.append(legsEl, score, setsEl);
+    card.append(name, scoreWrap);
     board.appendChild(card);
   });
 
@@ -270,10 +304,9 @@ function submitMatchScore() {
 
 // =====================================================
 // SUMMARY / AVERAGES — dynamic cards (2–6 players)
-// (v1.0 fields powered by v2.0 stats)
 // =====================================================
-function pct(n)      { return isFinite(n) ? `${(Math.round(n * 10) / 10).toFixed(1)}%` : "0.0%"; }
-function toFixed(n,d=1){ return (typeof n === "number" && isFinite(n)) ? n.toFixed(d) : "0.0"; }
+function pct(n)         { return isFinite(n) ? `${(Math.round(n * 10) / 10).toFixed(1)}%` : "0.0%"; }
+function toFixed(n,d=1) { return (typeof n === "number" && isFinite(n)) ? n.toFixed(d) : "0.0"; }
 
 function getSummaryArray() {
   const players = (Match && typeof Match.getPlayers === "function") ? Match.getPlayers() : [];
@@ -349,8 +382,7 @@ function renderSummaryScreen() {
 }
 
 // =====================================================
-// DOUBLES — v1.0 Hit/Miss UI backed by v2.0 engine
-// (engine APIs used: init, getCurrentTarget, enterScore, getStats, reset) [1](https://nhs-my.sharepoint.com/personal/james_mackenzie3_nhs_net/Documents/Microsoft%20Copilot%20Chat%20Files/doubles.js)
+// DOUBLES — Hit/Miss UI backed by v2.0 engine
 // =====================================================
 function classForPct(pct) { return (pct >= 66) ? "stat-ok" : (pct >= 33) ? "stat-warn" : "stat-bad"; }
 function fmtPct(n) { return (Math.round(n * 10) / 10).toFixed(1) + "%"; }
@@ -362,7 +394,6 @@ function updatePctEl(el, pct) {
 }
 
 function renderDoublesScreen() {
-  // ensure a target exists
   if (typeof Doubles.getCurrentTarget === "function" && Doubles.getCurrentTarget() == null) {
     try { Doubles.init(); } catch (e) { console.error("[Doubles.init] in renderDoublesScreen failed:", e); }
   }
