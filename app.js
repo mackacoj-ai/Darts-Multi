@@ -1,8 +1,8 @@
 // =============================================
-// APP CONTROLLER (v2.0 core + Doubles UI + dynamic Summary)
+// APP CONTROLLER (pointer events + dynamic Summary + v1.0 Doubles UI)
 // =============================================
-let scoreBuffer = "";                 // for match keypad
-let matchKeyListenerBound = false;    // guard multiple keydown handlers
+let scoreBuffer = "";                 // for match keypad entry
+let matchKeyListenerBound = false;    // avoid stacking keydown handlers
 
 let Match = null;
 let Doubles = null;
@@ -13,7 +13,7 @@ let Undo = null;
 let currentScreen = "setup";
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Cache engines
+  // Cache engines exposed on window
   Match   = window.MatchEngine;
   Doubles = window.DoublesEngine;
   Checkout= window.CheckoutEngine;
@@ -22,34 +22,13 @@ document.addEventListener("DOMContentLoaded", () => {
   setupNavigation();
   setupSetupScreen();
 
-  // Ensure Doubles has a target ready when needed
+  // Prepare a target for Doubles mode if the user opens that tab later
   if (Doubles && typeof Doubles.init === "function") {
     try { Doubles.init(); } catch (e) { console.error("[Doubles.init] failed:", e); }
   }
 
-  // Mobile UX: prevent double-tap zoom on interactive buttons
-  enableNoDoubleTapZoom();
-
   switchScreen("setup");
 });
-
-// =============================================
-// MOBILE: Prevent double-tap zoom on buttons/keys
-// =============================================
-function enableNoDoubleTapZoom() {
-  // CSS (touch-action) is in style.css; here we also block rapid double "touchend" default
-  let lastTouchEnd = 0;
-  document.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    // Only for interactive elements
-    const el = e.target.closest('.key, .select-btn, .btn-big, button');
-    if (!el) return;
-    if (now - lastTouchEnd <= 300) {
-      e.preventDefault(); // prevent double-tap zoom
-    }
-    lastTouchEnd = now;
-  }, { passive: false });
-}
 
 // =====================================================
 // NAVIGATION
@@ -57,7 +36,7 @@ function enableNoDoubleTapZoom() {
 function setupNavigation() {
   const navButtons = document.querySelectorAll(".top-nav button");
   navButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("pointerup", () => {
       const target = btn.dataset.screen;
       switchScreen(target);
       navButtons.forEach(b => b.classList.remove("active"));
@@ -99,7 +78,7 @@ function setupSetupScreen() {
 
   function wireSelectRow(rowEl, onChange) {
     if (!rowEl) return;
-    rowEl.addEventListener("click", (e) => {
+    rowEl.addEventListener("pointerup", (e) => {
       const btn = e.target.closest(".select-btn");
       if (!btn) return;
       [...rowEl.querySelectorAll(".select-btn")].forEach(b => b.classList.remove("active"));
@@ -134,7 +113,7 @@ function setupSetupScreen() {
       btn.className = "select-btn" + (i === 0 ? " active" : "");
       btn.dataset.index = i.toString();
       btn.textContent = `Start: P${i + 1}`;
-      btn.addEventListener("click", () => {
+      btn.addEventListener("pointerup", () => {
         [...throwerWrap.querySelectorAll(".select-btn")].forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
       });
@@ -152,7 +131,7 @@ function setupSetupScreen() {
   }
 
   // Wire selectors + initial render
-  wireSelectRow(modeRow,  () => {}); // Mode visible but not branching
+  wireSelectRow(modeRow,  () => {}); // Mode is visible but we always start X01 from Setup
   wireSelectRow(countRow, () => { renderNameInputs(); renderStartingThrower(); });
   wireSelectRow(scoreRow, () => {});
   renderNameInputs();
@@ -160,7 +139,7 @@ function setupSetupScreen() {
 
   // Always start an X01 match from Setup
   if (startBtn) {
-    startBtn.addEventListener("click", () => {
+    startBtn.addEventListener("pointerup", () => {
       const startingScore = getSelectedStartingScore();
       const startPlayer   = getSelectedStartPlayerIndex();
       const nameInputs    = [...nameWrap.querySelectorAll("input")];
@@ -204,7 +183,7 @@ function renderMatchScreen() {
     const name = document.createElement("h2");
     name.textContent = p.name ?? `Player ${idx + 1}`;
 
-    // Score + micro bar: L:x on left, S:x on right
+    // Score row with micro labels (L:x | SCORE | S:x)
     const scoreWrap = document.createElement("div");
     scoreWrap.className = "player-score-wrap";
 
@@ -245,7 +224,7 @@ function wireMatchKeypad() {
   const keys = document.querySelectorAll("#screen-match .key");
   if (!keys || keys.length === 0) return;
 
-  // remove previous listeners by cloning
+  // Remove previous listeners by cloning
   keys.forEach(key => {
     const clone = key.cloneNode(true);
     key.parentNode.replaceChild(clone, key);
@@ -253,7 +232,10 @@ function wireMatchKeypad() {
 
   const freshKeys = document.querySelectorAll("#screen-match .key");
   freshKeys.forEach(key => {
-    key.addEventListener("click", () => {
+    key.addEventListener("pointerup", (ev) => {
+      // react only to primary pointer (avoid right‑click / multi‑touch noise)
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+
       if (key.classList.contains("key-undo"))  { undoAction(); return; }
       if (key.classList.contains("key-enter")) { submitMatchScore(); return; }
       const val = key.textContent.trim();
@@ -382,7 +364,7 @@ function renderSummaryScreen() {
 }
 
 // =====================================================
-// DOUBLES — Hit/Miss UI backed by v2.0 engine
+// DOUBLES — v1.0 Hit/Miss UI backed by v2.0 engine
 // =====================================================
 function classForPct(pct) { return (pct >= 66) ? "stat-ok" : (pct >= 33) ? "stat-warn" : "stat-bad"; }
 function fmtPct(n) { return (Math.round(n * 10) / 10).toFixed(1) + "%"; }
@@ -394,6 +376,7 @@ function updatePctEl(el, pct) {
 }
 
 function renderDoublesScreen() {
+  // ensure a target exists
   if (typeof Doubles.getCurrentTarget === "function" && Doubles.getCurrentTarget() == null) {
     try { Doubles.init(); } catch (e) { console.error("[Doubles.init] in renderDoublesScreen failed:", e); }
   }
@@ -419,7 +402,8 @@ function bindDoublesButtons() {
   const hitBtn  = document.getElementById("doubles-hit-btn");
   const missBtn = document.getElementById("doubles-miss-btn");
   if (hitBtn && !hitBtn.dataset.bound) {
-    hitBtn.addEventListener("click", () => {
+    hitBtn.addEventListener("pointerup", (ev) => {
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
       const target = Doubles.getCurrentTarget();
       try { Doubles.enterScore(target); } catch (e) { console.error("[Doubles.enterScore] (hit) failed:", e); }
       renderDoublesScreen();
@@ -427,7 +411,8 @@ function bindDoublesButtons() {
     hitBtn.dataset.bound = "1";
   }
   if (missBtn && !missBtn.dataset.bound) {
-    missBtn.addEventListener("click", () => {
+    missBtn.addEventListener("pointerup", (ev) => {
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
       try { Doubles.enterScore(-1); } catch (e) { console.error("[Doubles.enterScore] (miss) failed:", e); }
       renderDoublesScreen();
     });
@@ -438,7 +423,7 @@ function bindDoublesButtons() {
 // =====================================================
 // SETTINGS
 // =====================================================
-document.getElementById("reset-data-btn")?.addEventListener("click", () => {
+document.getElementById("reset-data-btn")?.addEventListener("pointerup", () => {
   if (confirm("Reset all match and doubles data?")) {
     try { Match?.reset?.(); } catch {}
     try { Doubles?.reset?.(); } catch {}
